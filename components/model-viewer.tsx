@@ -2,19 +2,23 @@
 
 import { useRef, useState } from "react"
 import { Canvas } from "@react-three/fiber"
-import { PresentationControls, useGLTF, Environment, ContactShadows } from "@react-three/drei"
+import { PresentationControls, Environment, ContactShadows } from "@react-three/drei"
 import { Suspense } from "react"
 import { Button } from "@/components/ui/button"
 import { Loader2 } from "lucide-react"
 
 function Model() {
-  const { scene } = useGLTF("/assets/3d/duck.glb")
-  return <primitive object={scene} scale={2} position={[0, -1, 0]} />
+  return (
+    <mesh>
+      <boxGeometry args={[1, 1, 1]} />
+      <meshStandardMaterial color="hotpink" />
+    </mesh>
+  )
 }
 
 export function ModelViewer() {
   const [isLoading, setIsLoading] = useState(true)
-  const controlsRef = useRef(null)
+  const controlsRef = useRef<any>(null)
 
   return (
     <div className="relative h-full w-full bg-gradient-to-b from-pink-50 to-white">
@@ -28,7 +32,7 @@ export function ModelViewer() {
       )}
 
       <Canvas shadows camera={{ position: [0, 0, 5], fov: 50 }}>
-        <Suspense fallback={null} onLoad={() => setIsLoading(false)}>
+        <Suspense fallback={null}>
           <PresentationControls
             global
             rotation={[0, -0.3, 0]}

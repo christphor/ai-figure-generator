@@ -1,6 +1,9 @@
 // 文件位置：app/api/upload/route.ts
 import { NextRequest } from 'next/server'
 import 'server-only'
+import axios from 'axios'
+
+const SMMS_TOKEN = 'AcDTdclPmTfGspXGCtJzutHnxi4U6QLE'
 
 // 关闭默认的 bodyParser
 export const config = {
@@ -9,49 +12,9 @@ export const config = {
   },
 }
 
-async function getSmmsToken() {
-  console.log('正在获取sm.ms token...')
-  const tokenRequest = {
-    url: 'https://sm.ms/api/v2/token',
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: {
-      username: process.env.SMMS_USERNAME,
-      password: process.env.SMMS_PASSWORD,
-    }
-  }
-  // 创建一个新的对象用于日志，包含实际的环境变量值
-  const logRequest = {
-    ...tokenRequest,
-    body: {
-      username: process.env.SMMS_USERNAME,
-      password: '******' // 出于安全考虑，密码用星号代替
-    }
-  }
-  console.log('Token请求参数:', JSON.stringify(logRequest, null, 2))
-
-  const response = await fetch(tokenRequest.url, {
-    method: tokenRequest.method,
-    headers: tokenRequest.headers,
-    body: JSON.stringify(tokenRequest.body),
-  })
-
-  const data = await response.json()
-  console.log('获取token响应:', data)
-
-  if (data.success) {
-    console.log('获取token成功')
-    return data.data.token
-  } else {
-    console.error('获取token失败:', data.message)
-    throw new Error(data.message)
-  }
-}
-
 export async function POST(req: NextRequest) {
   console.log('上传API路由被调用')
+  console.log('当前SMMS_TOKEN值:', SMMS_TOKEN)
   
   try {
     const formData = await req.formData()
@@ -63,9 +26,6 @@ export async function POST(req: NextRequest) {
       return new Response(JSON.stringify({ error: '未上传文件' }), { status: 400 })
     }
 
-    // 获取sm.ms token
-    const token = await getSmmsToken()
-
     // 上传到sm.ms
     console.log('正在发送到sm.ms...')
     const smFormData = new FormData()
@@ -76,7 +36,7 @@ export async function POST(req: NextRequest) {
       url: 'https://sm.ms/api/v2/upload',
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${token}`
+        Authorization: SMMS_TOKEN
       },
       body: {
         smfile: file.name,
@@ -95,12 +55,47 @@ export async function POST(req: NextRequest) {
     const json = await smRes.json()
     console.log('sm.ms响应:', json)
 
+    let imageUrl = ''
     if (json.success) {
       console.log('上传成功, URL:', json.data.url)
-      return new Response(JSON.stringify({ url: json.data.url }), { status: 200 })
+      imageUrl = json.data.url
+    } else if (json.code === 'image_repeated') {
+      console.log('图片已存在, 使用已有URL:', json.images)
+      imageUrl = json.images
     } else {
       console.error('sm.ms上传失败:', json.message)
       return new Response(JSON.stringify({ error: json.message }), { status: 500 })
+    }
+
+    // 调用生成API
+    try {
+      const generateData = {
+        filesUrl: [imageUrl], // 使用获取到的图片URL
+        prompt: "Generate a cute 3D character based on the uploaded image",
+        size: "1:1",
+        callBackUrl: `${process.env.NEXT_PUBLIC_BASE_URL}/api/callback`
+      }
+      console.log('生成API请求参数:', JSON.stringify(generateData, null, 2))
+
+      const generateResponse = await axios.post('https://kieai.erweima.ai/api/v1/gpt4o-image/generate', generateData, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': 'Bearer 4e48d6b03667e511a646182a7a882885'
+        }
+      })
+      console.log('生成请求成功:', generateResponse.data)
+      
+      return new Response(JSON.stringify({ 
+        url: imageUrl,
+        generateResult: generateResponse.data 
+      }), { status: 200 })
+    } catch (error) {
+      console.error('生成请求失败:', error)
+      return new Response(JSON.stringify({ 
+        url: imageUrl,
+        error: '生成失败' 
+      }), { status: 200 })
     }
   } catch (error) {
     console.error('处理过程中出错:', error)
