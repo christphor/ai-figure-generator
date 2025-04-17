@@ -33,29 +33,57 @@ export function FileUpload() {
     e.preventDefault()
     if (!file) return
 
+    console.log('开始文件上传流程...')
     setIsUploading(true)
 
-    // Simulate upload progress
-    const interval = setInterval(() => {
-      setProgress((prev) => {
-        if (prev >= 95) {
-          clearInterval(interval)
-          return prev
-        }
-        return prev + 5
+    try {
+      console.log('创建表单数据...')
+      const formData = new FormData()
+      formData.append('file', file)
+
+      console.log('发送文件到服务器...')
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
       })
-    }, 300)
 
-    // Simulate API call
-    setTimeout(() => {
-      clearInterval(interval)
-      setProgress(100)
+      console.log('收到服务器响应:', response.status)
+      const data = await response.json()
+      console.log('服务器响应数据:', data)
 
-      // Redirect to results page after "processing"
+      if (!response.ok) {
+        throw new Error(data.error || '上传失败')
+      }
+
+      // 模拟上传进度
+      console.log('开始模拟上传进度...')
+      const interval = setInterval(() => {
+        setProgress((prev) => {
+          if (prev >= 95) {
+            clearInterval(interval)
+            return prev
+          }
+          return prev + 5
+        })
+      }, 300)
+
+      // 模拟 API 调用
       setTimeout(() => {
-        router.push("/results")
-      }, 1000)
-    }, 3000)
+        clearInterval(interval)
+        setProgress(100)
+        console.log('进度模拟完成')
+
+        // 处理完成后跳转到结果页面
+        console.log('正在跳转到结果页面...')
+        setTimeout(() => {
+          router.push("/results")
+        }, 1000)
+      }, 3000)
+    } catch (error) {
+      console.error('上传出错:', error)
+      setIsUploading(false)
+      setProgress(0)
+    }
   }
 
   return (
